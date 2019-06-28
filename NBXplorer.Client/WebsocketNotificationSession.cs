@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace NBXplorer
 {
-	public class NotificationSession : IDisposable
+	public class WebsocketNotificationSession : NotificationSessionBase, IDisposable
 	{
 
 		private readonly ExplorerClient _Client;
@@ -23,7 +23,7 @@ namespace NBXplorer
 				return _Client;
 			}
 		}
-		internal NotificationSession(ExplorerClient client)
+		internal WebsocketNotificationSession(ExplorerClient client)
 		{
 			if(client == null)
 				throw new ArgumentNullException(nameof(client));
@@ -103,6 +103,26 @@ namespace NBXplorer
 			return _MessageListener.Send(new Models.NewTransactionEventRequest() { CryptoCode = allCryptoCodes ? "*" : _Client.CryptoCode }, cancellation);
 		}
 
+		/// <summary>
+		/// Listen all tracked source
+		/// </summary>
+		/// <param name="allCryptoCodes">If true, all derivation schemes of all crypto code will get a notification (default: false)</param>
+		/// <param name="cancellation">Cancellation token</param>
+		public void ListenAllTrackedSource(bool allCryptoCodes = false, CancellationToken cancellation = default)
+		{
+			ListenAllTrackedSourceAsync(allCryptoCodes, cancellation).GetAwaiter().GetResult();
+		}
+
+		/// <summary>
+		/// Listen all tracked source
+		/// </summary>
+		/// <param name="allCryptoCodes">If true, all derivation schemes of all crypto code will get a notification (default: false)</param>
+		/// <param name="cancellation">Cancellation token</param>
+		public Task ListenAllTrackedSourceAsync(bool allCryptoCodes = false, CancellationToken cancellation = default)
+		{
+			return _MessageListener.Send(new Models.NewTransactionEventRequest() { CryptoCode = allCryptoCodes ? "*" : _Client.CryptoCode, ListenAllTrackedSource = true }, cancellation);
+		}
+
 		public void ListenDerivationSchemes(DerivationStrategyBase[] derivationSchemes, CancellationToken cancellation = default)
 		{
 			ListenDerivationSchemesAsync(derivationSchemes, cancellation).GetAwaiter().GetResult();
@@ -113,11 +133,17 @@ namespace NBXplorer
 			return _MessageListener.Send(new Models.NewTransactionEventRequest() { DerivationSchemes = derivationSchemes.Select(d=>d.ToString()).ToArray(), CryptoCode = _Client.CryptoCode }, cancellation);
 		}
 
-		public object NextEvent(CancellationToken cancellation = default)
+		public void ListenTrackedSources(TrackedSource[] trackedSources, CancellationToken cancellation = default)
 		{
-			return NextEventAsync(cancellation).GetAwaiter().GetResult();
+			ListenTrackedSourcesAsync(trackedSources, cancellation).GetAwaiter().GetResult();
 		}
-		public Task<object> NextEventAsync(CancellationToken cancellation = default)
+
+		public Task ListenTrackedSourcesAsync(TrackedSource[] trackedSources, CancellationToken cancellation = default)
+		{
+			return _MessageListener.Send(new Models.NewTransactionEventRequest() { TrackedSources = trackedSources.Select(d => d.ToString()).ToArray(), CryptoCode = _Client.CryptoCode }, cancellation);
+		}
+
+		public override Task<NewEventBase> NextEventAsync(CancellationToken cancellation = default)
 		{
 			return _MessageListener.NextMessageAsync(cancellation);
 		}

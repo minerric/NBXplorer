@@ -17,7 +17,9 @@ using NBitcoin;
 using System.Text;
 using System.Net;
 using CommandLine;
+using System.Runtime.CompilerServices;
 
+[assembly: InternalsVisibleTo("NBXplorer.Tests")]
 namespace NBXplorer
 {
 	public class Program
@@ -46,6 +48,7 @@ namespace NBXplorer
 					.ConfigureLogging(l =>
 					{
 						l.AddFilter("Microsoft", LogLevel.Error);
+						l.AddFilter("System.Net.Http.HttpClient", LogLevel.Critical);
 						l.AddFilter("NBXplorer.Authentication.BasicAuthenticationHandler", LogLevel.Critical);
 						if(conf.GetOrDefault<bool>("verbose", false))
 						{

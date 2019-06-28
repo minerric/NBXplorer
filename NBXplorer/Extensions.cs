@@ -27,31 +27,33 @@ using System.Threading;
 using Microsoft.AspNetCore.Authentication;
 using NBXplorer.Authentication;
 using NBitcoin.DataEncoders;
+using System.Text.RegularExpressions;
+using NBXplorer.MessageBrokers;
+using NBitcoin.Protocol;
 
 namespace NBXplorer
 {
 	public static class Extensions
 	{
-		internal static Task WaitOneAsync(this WaitHandle waitHandle)
+		internal static void AddRange<T>(this HashSet<T> hashset, IEnumerable<T> elements)
 		{
-			if(waitHandle == null)
-				throw new ArgumentNullException("waitHandle");
-
-			var tcs = new TaskCompletionSource<bool>();
-			var rwh = ThreadPool.RegisterWaitForSingleObject(waitHandle,
-				delegate
-				{
-					tcs.TrySetResult(true);
-				}, null, TimeSpan.FromMinutes(1.0), true);
-			var t = tcs.Task;
-			t.ContinueWith(_ => rwh.Unregister(null));
-			return t;
+			foreach (var el in elements)
+				hashset.Add(el);
 		}
 		internal static uint160 GetHash(this DerivationStrategyBase derivation)
 		{
 			var data = Encoding.UTF8.GetBytes(derivation.ToString());
 			return new uint160(Hashes.RIPEMD160(data, data.Length));
 		}
+		internal static uint160 GetHash(this TrackedSource trackedSource)
+		{
+			if (trackedSource is DerivationSchemeTrackedSource t)
+				return t.DerivationStrategy.GetHash();
+			var data = Encoding.UTF8.GetBytes(trackedSource.ToString());
+			return new uint160(Hashes.RIPEMD160(data, data.Length));
+		}
+
+
 		public static async Task<DateTimeOffset?> GetBlockTimeAsync(this RPCClient client, uint256 blockId, bool throwIfNotFound = true)
 		{
 			var response = await client.SendCommandAsync(new RPCRequest("getblockheader", new object[] { blockId }), throwIfNotFound).ConfigureAwait(false);
@@ -66,51 +68,14 @@ namespace NBXplorer
 			return null;
 		}
 
-		public static IEnumerable<TransactionMatch> GetMatches(this Repository repository, Transaction tx)
+		internal static KeyPathInformation AddAddress(this KeyPathInformation keyPathInformation, Network network)
 		{
-			var matches = new Dictionary<DerivationStrategyBase, TransactionMatch>();
-			HashSet<Script> inputScripts = new HashSet<Script>();
-			HashSet<Script> outputScripts = new HashSet<Script>();
-			HashSet<Script> scripts = new HashSet<Script>();
-			foreach(var input in tx.Inputs)
+			if(keyPathInformation.Address == null)
 			{
-				var signer = input.GetSigner();
-				if(signer != null)
-				{
-					inputScripts.Add(signer.ScriptPubKey);
-					scripts.Add(signer.ScriptPubKey);
-				}
+				keyPathInformation.Address = keyPathInformation.ScriptPubKey.GetDestinationAddress(network).ToString();
 			}
-
-			foreach(var output in tx.Outputs)
-			{
-				outputScripts.Add(output.ScriptPubKey);
-				scripts.Add(output.ScriptPubKey);
-			}
-
-			var keyInformations = repository.GetKeyInformations(scripts.ToArray());
-			foreach(var keyInfoByScripts in keyInformations)
-			{
-				foreach(var keyInfo in keyInfoByScripts.Value)
-				{
-					if(!matches.TryGetValue(keyInfo.DerivationStrategy, out TransactionMatch match))
-					{
-						match = new TransactionMatch();
-						matches.Add(keyInfo.DerivationStrategy, match);
-						match.DerivationStrategy = keyInfo.DerivationStrategy;
-						match.Transaction = tx;
-					}
-
-					if(outputScripts.Contains(keyInfo.ScriptPubKey))
-						match.Outputs.Add(keyInfo);
-
-					if(inputScripts.Contains(keyInfo.ScriptPubKey))
-						match.Inputs.Add(keyInfo);
-				}
-			}
-			return matches.Values;
+			return keyPathInformation;
 		}
-
 
 		class MVCConfigureOptions : IConfigureOptions<MvcJsonOptions>
 		{
@@ -170,8 +135,15 @@ namespace NBXplorer
 			services.TryAddSingleton<CookieRepository>();
 			services.TryAddSingleton<RepositoryProvider>();
 			services.TryAddSingleton<EventAggregator>();
-			services.TryAddSingleton<BitcoinDWaitersAccessor>();
-			services.AddSingleton<IHostedService, BitcoinDWaiters>();
+			services.TryAddSingleton<AddressPoolServiceAccessor>();
+			services.AddSingleton<IHostedService, AddressPoolService>();
+			services.TryAddSingleton<BitcoinDWaiters>();
+			services.TryAddSingleton<RebroadcasterHostedService>();
+			services.AddSingleton<IHostedService, ScanUTXOSetService>();
+			services.TryAddSingleton<ScanUTXOSetServiceAccessor>();
+			services.AddSingleton<IHostedService, BitcoinDWaiters>(o => o.GetRequiredService<BitcoinDWaiters>());
+			services.AddSingleton<IHostedService, RebroadcasterHostedService>(o => o.GetRequiredService<RebroadcasterHostedService>());
+			services.AddSingleton<IHostedService, BrokerHostedService>();
 
 			services.AddSingleton<ExplorerConfiguration>(o => o.GetRequiredService<IOptions<ExplorerConfiguration>>().Value);
 

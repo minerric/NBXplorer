@@ -36,10 +36,16 @@ namespace NBXplorer
 
 		public void ConfigureServices(IServiceCollection services)
 		{
+			services.AddHttpClient();
+			services.AddHttpClient(nameof(RPCClientProvider), httpClient =>
+			{
+				httpClient.Timeout = System.Threading.Timeout.InfiniteTimeSpan;
+			});
 			services.AddNBXplorer();
 			services.ConfigureNBxplorer(Configuration);
 			services.AddMvcCore()
 				.AddJsonFormatters()
+				.AddMvcOptions(o => o.InputFormatters.Add(new NoContentTypeInputFormatter()))
 				.AddAuthorization()
 				.AddFormatterMappings();
 			services.AddAuthentication("Basic")
@@ -58,6 +64,7 @@ namespace NBXplorer
 			Logs.Configure(loggerFactory);
 			app.UseAuthentication();
 			app.UseWebSockets();
+			//app.UseMiddleware<LogAllRequestsMiddleware>();
 			app.UseMvc();
 		}
 	}

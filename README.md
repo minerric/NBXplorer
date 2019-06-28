@@ -1,31 +1,53 @@
 [![NuGet](https://img.shields.io/nuget/v/NBxplorer.Client.svg)](https://www.nuget.org/packages/NBxplorer.Client) [![Docker Automated buil](https://img.shields.io/docker/automated/jrottenberg/ffmpeg.svg)](https://hub.docker.com/r/nicolasdorier/nbxplorer/)
+[![Build status](https://ci.appveyor.com/api/projects/status/c7kqj7a3nf7vmhsk?svg=true)](https://ci.appveyor.com/project/NicolasDorier/nbxplorer)[![CircleCI](https://circleci.com/gh/dgarage/NBXplorer.svg?style=svg)](https://circleci.com/gh/dgarage/NBXplorer)
 
 # NBXplorer
 
 A minimalist UTXO tracker for HD Wallets.
 The goal is to have a flexible, .NET based UTXO tracker for HD wallets.
-The explorer supports only P2PKH derivation for now but will be able to support more complex generation in near future. (m-n, segwit, p2sh)
+The explorer supports P2SH,P2PKH,P2WPKH,P2WSH and Multi-sig derivation.
 
 This explorer is not meant to be exposed on internet, but should be used as an internal tool for tracking the UTXOs of your own service.
 
-It currently supports:
+It has a bunch of feature:
 
-* Bitcoin
-* Litecoin
-* Dogecoin
-* Groestlcoin
-* Dash
-* Polis
+* Can pass arguments via environment variable, command line or configuration file
+* Automatically reconnect to your node if the connection goes temporarily down
+* An easy to use REST API
+* Persistence (via in-file no-SQL datbase called DBreeze)
+* Connect via RPC to broadcast transaction instead of using the P2P protocol like this example
+* Connect via RPC to your trusted node to get the proper fee rate.
+* Altcoin support
+* Huge test suite
+* Pruning of transaction data (in practice, we don't need to save the whole transaction, only the spent outpoint and received coin for the wallet)
+* Multi-wallet
+* Flexible address generation schemes (multisig, segwit, legacy etc...)
+* Pruning for big wallets (Removal of tracked transaction which do not impact the resulting UTXO set)
+
+It currently the following altcoins:
+
 * BCash (also known as Bitcoin Cash)
 * BGold (also known as Bitcoin Gold)
-* Monacoin
+* Bitcoin
+* Bitcore
+* ColossusXT
+* Dash
+* Dogecoin
 * Feathercoin
+* Gobyte
+* Groestlcoin
+* Litecoin
+* Monacoin
+* Monoeci
+* Polis
 * Ufo
 * Viacoin
 
+Read our [API Specification](docs/API.md), or our the [internal design of NBXplorer](docs/Design.md).
+
 ## Prerequisite
 
-* Install [.NET Core 2.1](https://www.microsoft.com/net/download)
+* Install [.NET Core SDK v2.1.4 (with patch version >= 402)](https://www.microsoft.com/net/download)
 * Bitcoin Core instance synched and running (at least 0.16.0).
 
 ## API Specification
@@ -160,6 +182,42 @@ this should return a JSON payload e.g.
     "feeRate": 9,
     "blockCount": 3
 }
+
+## Message Brokers
+### Azure Service Bus
+Support has been added for Azure Service Bus as a message broker. Currently 2 Queues and 2 Topics are supported
+
+### Queues
+* New Block
+* New Transaction
+
+### Topics
+* New Block
+* New Transaction
+
+
+Filters should be applied on the client, if required. 
+
+To activate Azure Service Bus Mesages you should add an Azure Service Bus Connection string to your config file or on the command line.
+
+* To use queues you should specify the queue names you wish to use
+* To use topics you should specify the topic names you wish to use
+
+You can use both queues and topics at the same time.
+
+#### Config Settings
+
+If you use the Configuration file to setup your NBXplorer options:
+
+```ini
+asbcnstr=Your Azure Service Bus Connection string
+asbblockq=Name of queue to send New Block message to
+asbtranq=Name of queue to send New Transaction message to
+asbblockt=Name of topic to send New Block message to
+asbtrant=[Name of queue to send New Transaction message to
+```
+
+Payloads are JSON and map to `NewBlockEvent`, `NewTransactionEvent` in the `NBXplorer.Models` namespace. There is no support in NBXplorer client for Azure Service Bus at the current time. You will need to use the `Serializer` in `NBXplorer.Client` to De-serialize the objects or then implement your own JSON de-serializers for the custom types used in the payload.
 
 #### Troubleshooting
 If you receive a 401 Unauthorized then your cookie data is not working. Check you are using the current cookie by opening the cookie file again - also check the date/time of the cookie file to ensure it is the latest cookie (generated when you launched NBXplorer).

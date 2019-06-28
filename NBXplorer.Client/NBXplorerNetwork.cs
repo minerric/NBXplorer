@@ -1,4 +1,5 @@
 ﻿using NBitcoin;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -48,16 +49,33 @@ namespace NBXplorer
 			internal set;
 		} = true;
 
+
+		private Serializer _Serializer;
+		public Serializer Serializer
+		{
+			get
+			{
+				_Serializer = _Serializer ?? new Serializer(NBitcoinNetwork);
+				return _Serializer;
+			}
+		}
+
+
+		public JsonSerializerSettings JsonSerializerSettings
+		{
+			get
+			{
+				return Serializer.Settings;
+			}
+		}
+
+		
+
 		public TimeSpan ChainLoadingTimeout
 		{
 			get;
 			set;
 		} = TimeSpan.FromMinutes(15);
-		public bool SupportEstimatesSmartFee
-		{
-			get;
-			set;
-		} = true;
 
 		/// <summary>
 		/// Minimum blocks to keep if pruning is activated

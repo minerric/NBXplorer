@@ -12,7 +12,7 @@ namespace NBXplorer.DerivationStrategy
 		Deposit = 0,
         	Direct =  2  
     	}
-	public abstract class DerivationStrategyBase
+	public abstract class DerivationStrategyBase : IHDScriptPubKey
 	{
 		internal DerivationStrategyBase()
 		{
@@ -25,6 +25,8 @@ namespace NBXplorer.DerivationStrategy
 		}
 		public static DerivationFeature GetFeature(KeyPath path)
 		{
+			if (path == null)
+				return DerivationFeature.Deposit;
 			return path.Indexes.Length == 1 ? DerivationFeature.Direct : (DerivationFeature)path.Indexes[0];
 		}
 		public DerivationStrategyBase GetLineFor(DerivationFeature derivationFeature)
@@ -45,7 +47,6 @@ namespace NBXplorer.DerivationStrategy
 		{
 			get;
 		}
-
 
 		public override bool Equals(object obj)
 		{
@@ -68,6 +69,8 @@ namespace NBXplorer.DerivationStrategy
 			return !(a == b);
 		}
 
+		public abstract IEnumerable<ExtPubKey> GetExtPubKeys();
+
 		public override int GetHashCode()
 		{
 			return StringValue.GetHashCode();
@@ -76,6 +79,17 @@ namespace NBXplorer.DerivationStrategy
 		public override string ToString()
 		{
 			return StringValue;
+		}
+
+		Script IHDScriptPubKey.ScriptPubKey => Derive(new KeyPath()).ScriptPubKey;
+		IHDScriptPubKey IHDScriptPubKey.Derive(KeyPath keyPath)
+		{
+			return GetLineFor(keyPath);
+		}
+
+		public bool CanDeriveHardenedPath()
+		{
+			return false;
 		}
 	}
 }
